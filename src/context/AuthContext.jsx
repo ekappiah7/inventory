@@ -3,6 +3,8 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   updateProfile,
 } from "firebase/auth";
@@ -70,6 +72,11 @@ export function AuthProvider({ children }) {
     return cred.user;
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+    return cred.user;
+  }, []);
+
   const logOut = useCallback(() => signOut(auth), []);
 
   const createStore = useCallback(async (storeName, displayName) => {
@@ -124,6 +131,7 @@ export function AuthProvider({ children }) {
     needsStoreSetup: profileLoaded && user && (!profile || !profile.storeId),
     signUp,
     logIn,
+    signInWithGoogle,
     logOut,
     createStore,
     joinStore,
