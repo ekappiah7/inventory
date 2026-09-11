@@ -9,12 +9,12 @@ import {
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyD0reNditJGaovS-eG-tM6RaAooVwFLE5Q",
+  authDomain: "inven-try.firebaseapp.com",
+  projectId: "inven-try",
+  storageBucket: "inven-try.firebasestorage.app",
+  messagingSenderId: "132530613273",
+  appId: "1:132530613273:web:b882458a3b872a99c5ce88",
 };
 
 export const app = initializeApp(firebaseConfig);
