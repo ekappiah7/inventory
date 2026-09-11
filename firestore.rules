@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(storeId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid));
+    }
+
+    function isOwner(storeId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data.role == 'owner';
+    }
+
+    // One profile doc per signed-in user, pointing at the store they belong
+    // to. Only that user can read or write it.
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /stores/{storeId} {
+      // Any signed-in user can look a store up by ID (needed so a staff
+      // member can verify the Store ID their owner gave them before
+      // joining). Stores can't be listed/enumerated, only fetched by ID.
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.ownerUid;
+      allow update: if isOwner(storeId);
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow read: if isMember(storeId);
+        // You can only ever create your OWN membership doc. Claiming the
+        // 'owner' role is only allowed if the store document already
+        // records you as its owner (set at store-creation time); anyone
+        // else who knows the Store ID can only join as 'staff'.
+        allow create: if isSignedIn() && request.auth.uid == uid &&
+          (
+            (request.resource.data.role == 'owner' &&
+              get(/databases/$(database)/documents/stores/$(storeId)).data.ownerUid == uid) ||
+            request.resource.data.role == 'staff'
+          );
+        // The owner can manage staff, but this simple rule set doesn't let
+        // anyone edit or remove the owner's own membership doc.
+        allow update, delete: if isOwner(storeId) &&
+          get(/databases/$(database)/documents/stores/$(storeId)).data.ownerUid != uid;
+      }
+
+      match /items/{itemId} {
+        allow read, create, update: if isMember(storeId);
+        allow delete: if isOwner(storeId);
+      }
+
+      match /suppliers/{supplierId} {
+        allow read, create, update: if isMember(storeId);
+        allow delete: if isOwner(storeId);
+      }
+
+      // Transactions are an audit trail: any staff member can add one, but
+      // nobody can edit or delete history after the fact.
+      match /transactions/{txId} {
+        allow read, create: if isMember(storeId);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
