@@ -32,7 +32,7 @@ export default function StockroomApp() {
   const [transactions, setTransactions] = useState(null);
   const [members, setMembers] = useState([]);
   const [tab, setTab] = useState("dashboard");
-  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -76,9 +76,9 @@ export default function StockroomApp() {
   const totalUnits = useMemo(() => (items || []).reduce((s, i) => s + i.qty, 0), [items]);
 
   const filtered = (items || []).filter((i) => {
-    const matchesQuery = !query || i.name.toLowerCase().includes(query.toLowerCase()) || (i.sku || "").toLowerCase().includes(query.toLowerCase());
+    const matchesSearch = !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.sku || "").toLowerCase().includes(search.toLowerCase());
     const matchesCat = category === "All" || (i.category || "General") === category;
-    return matchesQuery && matchesCat;
+    return matchesSearch && matchesCat;
   });
 
   const whoAmI = useCallback(() => ({ byUid: user.uid, byName: member?.displayName || user.email }), [user, member]);
@@ -206,8 +206,8 @@ export default function StockroomApp() {
           <div style={{ position: "relative", flex: "1 1 240px", maxWidth: 340 }}>
             <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: C.inkSoft }} />
             <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search items or SKU…"
               style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }}
             />
