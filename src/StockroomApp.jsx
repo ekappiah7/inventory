@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from "react";
 import {
   collection, doc, query, orderBy, limit, onSnapshot, getDocs,
-  addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment,
+  addDoc, updateDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp, increment,
 } from "firebase/firestore";
 import { Plus, Search, Upload } from "lucide-react";
 
@@ -9,6 +9,7 @@ import { db } from "./firebase.js";
 import { useAuth } from "./context/AuthContext.jsx";
 import { C, SANS, inputStyle } from "./utils/tokens.js";
 import { itemsToCsv, downloadCsv } from "./utils/parse.js";
+import { effectiveCost, weightedAverageCost, stockValue } from "./utils/costing.js";
 import { useIsNarrow } from "./utils/useIsNarrow.js";
 
 import Sidebar from "./components/Sidebar.jsx";
@@ -80,7 +81,7 @@ export default function StockroomApp() {
     [items]
   );
   const lowStock = useMemo(() => (items || []).filter((i) => i.qty <= i.reorderLevel), [items]);
-  const totalValue = useMemo(() => (items || []).reduce((s, i) => s + i.qty * (i.costPrice || 0), 0), [items]);
+  const totalValue = useMemo(() => stockValue(items || []), [items]);
   const totalUnits = useMemo(() => (items || []).reduce((s, i) => s + i.qty, 0), [items]);
 
   const filtered = (items || []).filter((i) => {
@@ -99,7 +100,10 @@ export default function StockroomApp() {
     try {
       const { id, ...fields } = form;
       const itemRef = await addDoc(collection(db, "stores", storeId, "items"), {
-        ...fields, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        ...fields,
+        avgCost: fields.costPrice || 0, // opening stock is worth what it cost
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
       if (fields.qty > 0) {
         await logTx({
@@ -136,14 +140,43 @@ export default function StockroomApp() {
     setDeleteTarget(null);
   }
 
-  async function applyMovement(item, type, qty, note, reason) {
+  async function applyMovement(item, type, qty, note, reason, purchaseUnitCost) {
     const safeQty = type === "out" ? Math.min(qty, item.qty) : qty;
     const delta = type === "in" ? safeQty : -safeQty;
+    const itemRef = doc(db, "stores", storeId, "items", item.id);
+    // What this movement is costed at: a purchase carries its own price, and
+    // anything else is valued at the stock's blended average.
+    let costForLog = typeof purchaseUnitCost === "number" ? purchaseUnitCost : effectiveCost(item);
+
     try {
-      await updateDoc(doc(db, "stores", storeId, "items", item.id), { qty: increment(delta), updatedAt: serverTimestamp() });
+      if (typeof purchaseUnitCost === "number") {
+        // A purchase has to read quantity and average together to reblend
+        // them, so it runs as a transaction rather than a blind increment.
+        costForLog = await runTransaction(db, async (tx) => {
+          const snap = await tx.get(itemRef);
+          if (!snap.exists()) throw new Error("Item no longer exists");
+          const current = snap.data();
+          const avgCost = weightedAverageCost({
+            currentQty: current.qty,
+            currentAvgCost: effectiveCost(current),
+            incomingQty: safeQty,
+            incomingUnitCost: purchaseUnitCost,
+          });
+          tx.update(itemRef, {
+            qty: (current.qty || 0) + safeQty,
+            avgCost,
+            costPrice: purchaseUnitCost, // latest price paid, the default next time
+            updatedAt: serverTimestamp(),
+          });
+          return purchaseUnitCost;
+        });
+      } else {
+        await updateDoc(itemRef, { qty: increment(delta), updatedAt: serverTimestamp() });
+      }
+
       await logTx({
         itemId: item.id, itemName: item.name, type, reason, qty: safeQty, note: note || "",
-        unitCost: item.costPrice || 0, unitPrice: item.sellPrice || 0,
+        unitCost: costForLog, unitPrice: item.sellPrice || 0,
       });
       setSaveNote("");
     } catch {
@@ -158,7 +191,7 @@ export default function StockroomApp() {
       let totalQty = 0;
       for (const row of rows) {
         const itemRef = doc(collection(db, "stores", storeId, "items"));
-        batch.set(itemRef, { ...row, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        batch.set(itemRef, { ...row, avgCost: row.costPrice || 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
         totalQty += row.qty || 0;
       }
       const txRef = doc(collection(db, "stores", storeId, "transactions"));

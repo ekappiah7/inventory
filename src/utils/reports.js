@@ -1,5 +1,6 @@
 // Pure report maths, kept away from React and Firestore so it can be tested
 // directly. Everything here takes plain arrays and returns plain values.
+import { effectiveCost } from "./costing.js";
 
 // A stock-out only counts as revenue when it was recorded as an actual sale
 // and carries the price snapshot taken at the time it happened.
@@ -66,7 +67,7 @@ export function notSelling(items, sales, limit = 8) {
   const soldItemIds = new Set(sales.map((t) => t.itemId));
   return items
     .filter((i) => i.qty > 0 && !soldItemIds.has(i.id))
-    .map((i) => ({ label: i.name, value: i.qty * (i.costPrice || 0), qty: i.qty, unit: i.unit }))
+    .map((i) => ({ label: i.name, value: i.qty * effectiveCost(i), qty: i.qty, unit: i.unit }))
     .sort((a, b) => b.value - a.value)
     .slice(0, limit);
 }

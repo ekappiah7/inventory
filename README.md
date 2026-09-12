@@ -106,6 +106,17 @@ your live app.
 - Re-deploying: after any code change, run `npm run build && firebase
   deploy` again. If you change `firestore.rules`, deploy those
   separately with `firebase deploy --only firestore:rules`.
+- How item cost is worked out: each item carries a weighted average cost
+  of the stock actually on hand. When you record a delivery ("Stock in"
+  with reason "Purchased from supplier") you enter what you paid per
+  unit, and that blends into the average by quantity. Buy 10 bags at 38
+  when you already hold 10 at 38, then 10 more at 45, and the average
+  becomes 41.50, so profit reflects what the goods really cost rather
+  than whatever was last typed into the cost price field. Selling does
+  not change the average. The "Cost price" field is just the price you
+  expect to pay, used as the default when receiving stock. You can
+  correct an item's average by hand when editing it, which is what you
+  want when entering stock bought before you started using the app.
 - Reports and stock-out reasons: every stock-out asks for a reason
   (Sold to customer, Damaged/expired/lost, or Other adjustment). Only
   the ones marked "Sold to customer" count toward revenue and profit in

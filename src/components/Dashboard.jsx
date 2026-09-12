@@ -19,7 +19,7 @@ export default function Dashboard({ items, lowStock, totalValue, totalUnits, onR
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 26 }}>
         <StatCard label="Items tracked" value={items.length} />
         <StatCard label="Units on hand" value={totalUnits} />
-        <StatCard label="Stock value" value={`GH₵${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} sub="At cost price" />
+        <StatCard label="Stock value" value={`GH₵${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} sub="At average cost" />
         <StatCard label="Needs restock" value={lowStock.length} accent={lowStock.length ? C.rust : C.green} />
       </div>
 

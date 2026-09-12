@@ -64,6 +64,24 @@ export default function AddItemModal({ item, suppliers = [], onClose, onSave }) 
 
         <Field label="Cost price (GH₵)"><input type="number" style={inputStyle} value={form.costPrice} onChange={(e) => set("costPrice", parseFloat(e.target.value) || 0)} /></Field>
         <Field label="Sell price (GH₵)"><input type="number" style={inputStyle} value={form.sellPrice} onChange={(e) => set("sellPrice", parseFloat(e.target.value) || 0)} /></Field>
+
+        {item && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <Field label="Average cost of stock on hand (GH₵)">
+              <input
+                type="number"
+                step="0.01"
+                style={inputStyle}
+                value={form.avgCost ?? form.costPrice ?? 0}
+                onChange={(e) => set("avgCost", parseFloat(e.target.value) || 0)}
+              />
+            </Field>
+            <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 4, lineHeight: 1.45 }}>
+              Recalculated automatically each time you record a delivery, and used to work out profit. Only change it by hand if
+              it's wrong, for example when you're setting up stock you bought before using this app.
+            </div>
+          </div>
+        )}
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>

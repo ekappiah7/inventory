@@ -17,9 +17,11 @@ export default function MovementModal({ item, type, onClose, onConfirm }) {
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState("");
   const [reason, setReason] = useState(type === "in" ? "purchase" : "sale");
+  const [unitCost, setUnitCost] = useState(item.costPrice || 0);
   const isIn = type === "in";
   const exceedsOnHand = !isIn && qty > item.qty;
   const reasons = isIn ? IN_REASONS : OUT_REASONS;
+  const isPurchase = isIn && reason === "purchase";
 
   return (
     <Modal title={`${isIn ? "Stock in" : "Stock out"}: ${item.name}`} onClose={onClose} width={380}>
@@ -47,13 +49,31 @@ export default function MovementModal({ item, type, onClose, onConfirm }) {
             Only {item.qty} {item.unit} on hand — you can't take out more than that. If a count is wrong, edit the item's quantity directly instead.
           </div>
         )}
+        {isPurchase && (
+          <Field label="Cost per unit on this delivery (GH₵)">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              style={inputStyle}
+              value={unitCost}
+              onChange={(e) => setUnitCost(parseFloat(e.target.value) || 0)}
+            />
+          </Field>
+        )}
         <Field label="Note (optional)">
           <input style={inputStyle} value={note} onChange={(e) => setNote(e.target.value)} placeholder={isIn ? "e.g. Delivery from supplier" : "e.g. Sold to customer"} />
         </Field>
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button variant="solid" disabled={qty <= 0 || exceedsOnHand} onClick={() => onConfirm(qty, note, reason)}>{isIn ? "Add stock" : "Remove stock"}</Button>
+        <Button
+          variant="solid"
+          disabled={qty <= 0 || exceedsOnHand}
+          onClick={() => onConfirm(qty, note, reason, isPurchase ? unitCost : undefined)}
+        >
+          {isIn ? "Add stock" : "Remove stock"}
+        </Button>
       </div>
     </Modal>
   );
