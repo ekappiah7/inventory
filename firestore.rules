@@ -16,17 +16,31 @@ service cloud.firestore {
         get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data.role == 'owner';
     }
 
+    function ownsStore(storeId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/stores/$(storeId)).data.ownerUid == request.auth.uid;
+    }
+
     // One profile doc per signed-in user, pointing at the store they belong
     // to. Only that user can read or write it.
     match /users/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
     }
 
-    match /stores/{storeId} {
-      // Any signed-in user can look a store up by ID (needed so a staff
-      // member can verify the Store ID their owner gave them before
-      // joining). Stores can't be listed/enumerated, only fetched by ID.
+    // Invite codes are how staff join a shop. The code itself is the secret,
+    // so anyone signed in can look one up by code, but nobody can list them.
+    // Only the shop's owner can mint or revoke codes, which is what makes an
+    // invite rotatable: create a new one, delete the old one.
+    match /invites/{code} {
       allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && ownsStore(request.resource.data.storeId);
+      allow delete: if isSignedIn() && ownsStore(resource.data.storeId);
+      allow update: if false;
+    }
+
+    match /stores/{storeId} {
+      allow get: if isMember(storeId);
       allow list: if false;
       allow create: if isSignedIn() && request.auth.uid == request.resource.data.ownerUid;
       allow update: if isOwner(storeId);
@@ -34,18 +48,19 @@ service cloud.firestore {
 
       match /members/{uid} {
         allow read: if isMember(storeId);
-        // You can only ever create your OWN membership doc. Claiming the
-        // 'owner' role is only allowed if the store document already
-        // records you as its owner (set at store-creation time); anyone
-        // else who knows the Store ID can only join as 'staff'.
+        // You can only ever create your OWN membership. The owner role is
+        // only claimable by the uid the store records as its owner; everyone
+        // else has to present a currently-valid invite code for this store,
+        // so revoking a code stops further joins.
         allow create: if isSignedIn() && request.auth.uid == uid &&
           (
             (request.resource.data.role == 'owner' &&
               get(/databases/$(database)/documents/stores/$(storeId)).data.ownerUid == uid) ||
-            request.resource.data.role == 'staff'
+            (request.resource.data.role == 'staff' &&
+              get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.storeId == storeId)
           );
-        // The owner can manage staff, but this simple rule set doesn't let
-        // anyone edit or remove the owner's own membership doc.
+        // The owner can remove staff, but nobody can touch the owner's own
+        // membership record.
         allow update, delete: if isOwner(storeId) &&
           get(/databases/$(database)/documents/stores/$(storeId)).data.ownerUid != uid;
       }

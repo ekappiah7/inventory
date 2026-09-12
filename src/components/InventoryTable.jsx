@@ -29,8 +29,8 @@ export default function InventoryTable({ items, categories, category, setCategor
       {items.length === 0 ? (
         <div style={{ color: C.inkSoft, fontSize: 13.5, padding: "20px 0" }}>No items match. Add one, or import a list.</div>
       ) : (
-        <div style={{ background: C.panel, border: `1px solid ${C.brownFaint}`, borderRadius: 12, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ background: C.panel, border: `1px solid ${C.brownFaint}`, borderRadius: 12, overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: C.panelAlt, textAlign: "left" }}>
                 {["Item", "Category", "On hand", "Reorder at", "Unit value", "", ""].map((h) => (

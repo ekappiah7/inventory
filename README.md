@@ -54,9 +54,19 @@ This opens the app at `http://localhost:5173` talking to your real
 Firebase project, so you can try it before deploying.
 
 The first account to sign up on a fresh project should choose "Create a
-shop." That becomes the store owner and gets a Store ID (shown under the
-Team tab) to hand to staff. Everyone else signs up and chooses "Join
-with Store ID."
+shop." That becomes the store owner and gets an invite code (shown under
+the Team tab) to hand to staff. Everyone else signs up and chooses "Join
+with a code."
+
+Before pushing changes, run the checks:
+
+```
+npm run check
+```
+
+That runs ESLint and the test suite. `npm run ship` runs both before it
+builds and deploys, so a lint error or failing test stops a bad deploy
+rather than shipping it.
 
 ## 5. Deploy to Firebase Hosting
 
@@ -104,6 +114,19 @@ your live app.
   transaction at the moment it happens, so editing an item's price later
   doesn't change past reports.
 - New shops start empty: there's no more sample/demo stock seeded in
-  automatically. If your shop already has the four example items
-  (Basmati Rice, Cooking Oil, Sugar, Tomato Paste) from before this
-  change, delete them from the Inventory tab (trash icon, owner only).
+  automatically. The Team tab also has an owner-only "Clear all shop
+  data" reset if you want to wipe a shop back to nothing.
+- Invite codes: staff join with an 8-character code rather than the raw
+  Store ID, and the owner can generate a new one at any time from the
+  Team tab. Generating a new code immediately stops the old one working,
+  which is how you cut off a code that leaked. Removing someone from the
+  Team tab revokes their access straight away.
+- Reports read their own slice of history (up to 5,000 movements for the
+  chosen period) rather than the dashboard's live 500-entry feed, so the
+  profit figures stay correct as the shop's history grows.
+- Backups: nothing is backed up automatically. The Team tab has a
+  "Download backup" button that saves the whole shop (items, suppliers,
+  full movement history) as one JSON file. Take one regularly. If you
+  later move the project to Firebase's Blaze plan, you can schedule
+  proper server-side exports with
+  `gcloud firestore export gs://your-bucket` on a Cloud Scheduler job.

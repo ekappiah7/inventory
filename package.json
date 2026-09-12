@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "ship": "git pull origin main && npm install && vite build && firebase deploy"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "check": "npm run lint && npm run test",
+    "ship": "git pull origin main && npm install && npm run check && vite build && firebase deploy"
   },
   "dependencies": {
     "firebase": "^10.12.2",
@@ -19,7 +22,16 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.3.1"
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.12.0",
+    "jsdom": "^30.0.1",
+    "vite": "^5.3.1",
+    "vitest": "^2.1.9"
   }
 }

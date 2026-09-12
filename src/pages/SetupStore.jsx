@@ -7,7 +7,7 @@ export default function SetupStore() {
   const { user, createStore, joinStore, logOut } = useAuth();
   const [mode, setMode] = useState("create"); // "create" | "join"
   const [storeName, setStoreName] = useState("");
-  const [storeId, setStoreId] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [displayName, setDisplayName] = useState(user?.displayName || "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -22,8 +22,8 @@ export default function SetupStore() {
         if (!storeName.trim()) throw new Error("Enter a name for your shop.");
         await createStore(storeName, displayName);
       } else {
-        if (!storeId.trim()) throw new Error("Enter the Store ID your shop owner gave you.");
-        await joinStore(storeId, displayName);
+        if (!inviteCode.trim()) throw new Error("Enter the invite code your shop owner gave you.");
+        await joinStore(inviteCode, displayName);
       }
     } catch (err) {
       setError(err.message || "Something went wrong. Try again.");
@@ -42,7 +42,7 @@ export default function SetupStore() {
         <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
           {[
             { id: "create", label: "Create a shop" },
-            { id: "join", label: "Join with Store ID" },
+            { id: "join", label: "Join with a code" },
           ].map((t) => (
             <button
               key={t.id}
@@ -69,8 +69,13 @@ export default function SetupStore() {
               <input style={inputStyle} value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="e.g. Adom Provisions Store" />
             </Field>
           ) : (
-            <Field label="Store ID">
-              <input style={inputStyle} value={storeId} onChange={(e) => setStoreId(e.target.value)} placeholder="Paste the ID your shop owner shared" />
+            <Field label="Invite code">
+              <input
+                style={{ ...inputStyle, textTransform: "uppercase", letterSpacing: 1 }}
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="e.g. K7RM29PQ"
+              />
             </Field>
           )}
 

@@ -9,6 +9,7 @@ import { db } from "./firebase.js";
 import { useAuth } from "./context/AuthContext.jsx";
 import { C, SANS, inputStyle } from "./utils/tokens.js";
 import { itemsToCsv, downloadCsv } from "./utils/parse.js";
+import { useIsNarrow } from "./utils/useIsNarrow.js";
 
 import Sidebar from "./components/Sidebar.jsx";
 import Dashboard from "./components/Dashboard.jsx";
@@ -23,10 +24,13 @@ import { Button, ConfirmDialog } from "./components/ui.jsx";
 
 const ImportModal = lazy(() => import("./components/ImportModal.jsx"));
 
+const slug = (name) => (name || "stockroom").replace(/\s+/g, "-").toLowerCase();
+
 export default function StockroomApp() {
-  const { user, store, member, logOut } = useAuth();
+  const { user, store, member, logOut, regenerateInvite, removeMember } = useAuth();
   const storeId = store.id;
   const isOwner = member?.role === "owner";
+  const isNarrow = useIsNarrow();
 
   const [items, setItems] = useState(null);
   const [suppliers, setSuppliers] = useState(null);
@@ -40,6 +44,7 @@ export default function StockroomApp() {
   const [moveItem, setMoveItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // { kind: 'item'|'supplier', doc }
+  const [removeTarget, setRemoveTarget] = useState(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [saveNote, setSaveNote] = useState("");
@@ -103,7 +108,7 @@ export default function StockroomApp() {
         });
       }
       setSaveNote("");
-    } catch (e) {
+    } catch {
       setSaveNote("Couldn't save that item — try again.");
     }
     setShowAdd(false);
@@ -114,7 +119,7 @@ export default function StockroomApp() {
       const { id, ...fields } = form;
       await updateDoc(doc(db, "stores", storeId, "items", id), { ...fields, updatedAt: serverTimestamp() });
       setSaveNote("");
-    } catch (e) {
+    } catch {
       setSaveNote("Couldn't save changes — try again.");
     }
     setEditItem(null);
@@ -125,7 +130,7 @@ export default function StockroomApp() {
     try {
       await deleteDoc(doc(db, "stores", storeId, kind === "item" ? "items" : "suppliers", target.id));
       setSaveNote("");
-    } catch (e) {
+    } catch {
       setSaveNote(`Couldn't delete that ${kind} — try again.`);
     }
     setDeleteTarget(null);
@@ -141,7 +146,7 @@ export default function StockroomApp() {
         unitCost: item.costPrice || 0, unitPrice: item.sellPrice || 0,
       });
       setSaveNote("");
-    } catch (e) {
+    } catch {
       setSaveNote("Couldn't record that movement — try again.");
     }
     setMoveItem(null);
@@ -163,7 +168,7 @@ export default function StockroomApp() {
       });
       await batch.commit();
       setSaveNote("");
-    } catch (e) {
+    } catch {
       setSaveNote("Couldn't import that file — try again.");
     }
     setShowImport(false);
@@ -172,7 +177,7 @@ export default function StockroomApp() {
   async function addSupplier(form) {
     try {
       await addDoc(collection(db, "stores", storeId, "suppliers"), { ...form, createdAt: serverTimestamp() });
-    } catch (e) {
+    } catch {
       setSaveNote("Couldn't save that supplier — try again.");
     }
   }
@@ -180,7 +185,7 @@ export default function StockroomApp() {
   async function updateSupplier(id, form) {
     try {
       await updateDoc(doc(db, "stores", storeId, "suppliers", id), form);
-    } catch (e) {
+    } catch {
       setSaveNote("Couldn't save changes — try again.");
     }
   }
@@ -200,16 +205,43 @@ export default function StockroomApp() {
         }
       }
       setSaveNote("");
-    } catch (e) {
+    } catch {
       setSaveNote("Couldn't clear everything — make sure you're signed in as the shop owner, then try again.");
     }
     setClearing(false);
     setShowClearConfirm(false);
   }
 
+  // Full point-in-time copy of the shop, since Firestore isn't backed up
+  // anywhere on its own.
+  async function downloadBackup() {
+    try {
+      const dump = {};
+      for (const name of ["items", "suppliers", "transactions"]) {
+        const snap = await getDocs(collection(db, "stores", storeId, name));
+        dump[name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
+      const payload = {
+        store: { id: storeId, name: store.name },
+        exportedAt: new Date().toISOString(),
+        ...dump,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${slug(store.name)}-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setSaveNote("");
+    } catch {
+      setSaveNote("Couldn't build that backup — try again.");
+    }
+  }
+
   function exportInventory() {
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`${(store.name || "stockroom").replace(/\s+/g, "-").toLowerCase()}-inventory-${stamp}.csv`, itemsToCsv(items || []));
+    downloadCsv(`${slug(store.name)}-inventory-${stamp}.csv`, itemsToCsv(items || []));
   }
 
   if (!loaded) {
@@ -221,7 +253,7 @@ export default function StockroomApp() {
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: C.bgPage, fontFamily: SANS }}>
+    <div style={{ display: "flex", flexDirection: isNarrow ? "column" : "row", minHeight: "100vh", background: C.bgPage, fontFamily: SANS }}>
       <Sidebar
         tab={tab}
         setTab={setTab}
@@ -230,9 +262,10 @@ export default function StockroomApp() {
         displayName={member?.displayName}
         role={member?.role}
         onSignOut={logOut}
+        isNarrow={isNarrow}
       />
 
-      <div style={{ flex: 1, padding: "22px 28px", overflowY: "auto" }}>
+      <div style={{ flex: 1, padding: isNarrow ? "16px 14px" : "22px 28px", overflowY: "auto", minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, gap: 12, flexWrap: "wrap" }}>
           <div style={{ position: "relative", flex: "1 1 240px", maxWidth: 340 }}>
             <Search size={15} style={{ position: "absolute", left: 10, top: 10, color: C.inkSoft }} />
@@ -269,7 +302,7 @@ export default function StockroomApp() {
             onExport={exportInventory}
           />
         )}
-        {tab === "reports" && <ReportsTab items={items} transactions={transactions} />}
+        {tab === "reports" && <ReportsTab storeId={storeId} items={items} isNarrow={isNarrow} />}
         {tab === "suppliers" && (
           <SuppliersTab
             suppliers={suppliers}
@@ -283,11 +316,14 @@ export default function StockroomApp() {
         {tab === "log" && <ActivityLog transactions={transactions} />}
         {tab === "team" && (
           <TeamTab
-            storeId={storeId}
-            storeName={store.name}
+            store={store}
             members={members}
-            canClear={isOwner}
+            currentUid={user.uid}
+            isOwner={isOwner}
             itemCount={items.length}
+            onRegenerateInvite={() => regenerateInvite(storeId, store.inviteCode)}
+            onRemoveMember={(m) => setRemoveTarget(m)}
+            onBackup={downloadBackup}
             onClearRequest={() => setShowClearConfirm(true)}
           />
         )}
@@ -302,6 +338,23 @@ export default function StockroomApp() {
         <Suspense fallback={null}>
           <ImportModal onClose={() => setShowImport(false)} onCommit={commitImport} />
         </Suspense>
+      )}
+      {removeTarget && (
+        <ConfirmDialog
+          title="Remove team member"
+          message={`Remove ${removeTarget.displayName || removeTarget.email} from ${store.name}? They lose access immediately. Their past entries stay in the activity log.`}
+          confirmLabel="Remove"
+          onConfirm={async () => {
+            try {
+              await removeMember(storeId, removeTarget.id);
+              setSaveNote("");
+            } catch {
+              setSaveNote("Couldn't remove that person — try again.");
+            }
+            setRemoveTarget(null);
+          }}
+          onCancel={() => setRemoveTarget(null)}
+        />
       )}
       {showClearConfirm && (
         <ConfirmDialog

@@ -44,8 +44,8 @@ export default function SuppliersTab({ suppliers, items, canDelete, onAdd, onUpd
           No suppliers yet. Add one, or they'll appear automatically as you type new supplier names on items.
         </div>
       ) : (
-        <div style={{ background: C.panel, border: `1px solid ${C.brownFaint}`, borderRadius: 12, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ background: C.panel, border: `1px solid ${C.brownFaint}`, borderRadius: 12, overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: C.panelAlt, textAlign: "left" }}>
                 {["Supplier", "Contact", "Phone", "Items", ""].map((h) => (

@@ -1,6 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import { db } from "../firebase.js";
 import { C, SERIF } from "../utils/tokens.js";
 import { StatCard } from "./Dashboard.jsx";
+import { summarise, profitTrend, topSellers, notSelling, needsRestock } from "../utils/reports.js";
 
 const PERIODS = [
   { id: 7, label: "7 days" },
@@ -8,6 +11,10 @@ const PERIODS = [
   { id: 90, label: "90 days" },
   { id: "all", label: "All time" },
 ];
+
+// Ceiling on how much history one report pulls. Far above what a small shop
+// generates in a year, but stops an unbounded read if it ever grows.
+const MAX_ROWS = 5000;
 
 const cardWrap = { background: C.panel, border: `1px solid ${C.brownFaint}`, borderRadius: 12, padding: "16px 18px" };
 const sectionHeading = { fontFamily: SERIF, fontSize: 17, color: C.brownDark, marginBottom: 10 };
@@ -39,99 +46,74 @@ function HorizontalBars({ rows, valueLabel }) {
   );
 }
 
-function DailyTrendChart({ days }) {
-  const max = Math.max(1, ...days.map((d) => Math.abs(d.profit)));
+function TrendChart({ points }) {
+  const max = Math.max(1, ...points.map((p) => Math.abs(p.profit)));
+  const label = (at) => new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 110, borderBottom: `1px solid ${C.brownFaint}` }}>
-        {days.map((d, idx) => (
+        {points.map((p) => (
           <div
-            key={idx}
-            title={`${d.key}: GH₵${d.profit.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+            key={p.at}
+            title={`${label(p.at)}: GH₵${p.profit.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
             style={{
               flex: 1, minWidth: 3,
-              height: `${Math.max(2, (Math.abs(d.profit) / max) * 100)}%`,
-              background: d.profit < 0 ? C.rust : C.green,
+              height: `${Math.max(2, (Math.abs(p.profit) / max) * 100)}%`,
+              background: p.profit < 0 ? C.rust : C.green,
               borderRadius: "3px 3px 0 0",
             }}
           />
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.inkSoft, marginTop: 6 }}>
-        <span>{days[0]?.key}</span>
-        <span>{days[days.length - 1]?.key}</span>
+        <span>{label(points[0].at)}</span>
+        <span>{label(points[points.length - 1].at)}</span>
       </div>
     </div>
   );
 }
 
-export default function ReportsTab({ items, transactions }) {
+export default function ReportsTab({ storeId, items, isNarrow }) {
   const [period, setPeriod] = useState(30);
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState("");
 
-  const cutoff = period === "all" ? 0 : Date.now() - period * 86400000;
-  const inRange = useMemo(() => transactions.filter((t) => t.date >= cutoff), [transactions, cutoff]);
+  // Reports read their own slice of history rather than the dashboard's live
+  // feed, which only keeps the most recent 500 entries and would silently
+  // under-report once a shop passes that.
+  useEffect(() => {
+    let cancelled = false;
+    setRows(null);
+    setError("");
+    const base = collection(db, "stores", storeId, "transactions");
+    const q =
+      period === "all"
+        ? query(base, orderBy("date", "desc"), limit(MAX_ROWS))
+        : query(base, where("date", ">=", Date.now() - period * 86400000), orderBy("date", "desc"), limit(MAX_ROWS));
+    getDocs(q)
+      .then((snap) => {
+        if (!cancelled) setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRows([]);
+          setError("Couldn't load report data. Check your connection and try again.");
+        }
+      });
+    return () => { cancelled = true; };
+  }, [storeId, period]);
 
-  const sales = useMemo(
-    () => inRange.filter((t) => t.type === "out" && t.reason === "sale" && typeof t.unitPrice === "number" && typeof t.unitCost === "number"),
-    [inRange]
+  const stats = useMemo(() => summarise(rows || []), [rows]);
+  const trend = useMemo(
+    () => profitTrend(stats.sales, { weekly: period === "all" || period > 45 }),
+    [stats.sales, period]
   );
-  const waste = useMemo(() => inRange.filter((t) => t.type === "out" && t.reason === "waste"), [inRange]);
-
-  const revenue = sales.reduce((s, t) => s + t.qty * t.unitPrice, 0);
-  const cogs = sales.reduce((s, t) => s + t.qty * t.unitCost, 0);
-  const grossProfit = revenue - cogs;
-  const margin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
-  const unitsSold = sales.reduce((s, t) => s + t.qty, 0);
-  const wasteCost = waste.reduce((s, t) => s + t.qty * (t.unitCost || 0), 0);
-
-  const trend = useMemo(() => {
-    const bucketMs = period !== "all" && period <= 45 ? 86400000 : 7 * 86400000;
-    const buckets = new Map();
-    for (const t of sales) {
-      const key = Math.floor(t.date / bucketMs) * bucketMs;
-      const entry = buckets.get(key) || { revenue: 0, cogs: 0 };
-      entry.revenue += t.qty * t.unitPrice;
-      entry.cogs += t.qty * t.unitCost;
-      buckets.set(key, entry);
-    }
-    return Array.from(buckets.entries())
-      .sort((a, b) => a[0] - b[0])
-      .slice(-60)
-      .map(([key, v]) => ({
-        key: new Date(key).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-        profit: v.revenue - v.cogs,
-      }));
-  }, [sales, period]);
-
-  const topSellers = useMemo(() => {
-    const byItem = new Map();
-    for (const t of sales) {
-      const entry = byItem.get(t.itemId) || { label: t.itemName, value: 0, units: 0 };
-      entry.value += t.qty * t.unitPrice;
-      entry.units += t.qty;
-      byItem.set(t.itemId, entry);
-    }
-    return Array.from(byItem.values()).sort((a, b) => b.value - a.value).slice(0, 6);
-  }, [sales]);
-
-  const notSelling = useMemo(() => {
-    const soldItemIds = new Set(sales.map((t) => t.itemId));
-    return items
-      .filter((i) => i.qty > 0 && !soldItemIds.has(i.id))
-      .map((i) => ({ label: i.name, value: i.qty * (i.costPrice || 0), qty: i.qty, unit: i.unit }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [items, sales]);
-
-  const needsRestock = useMemo(() => {
-    return items
-      .filter((i) => i.qty <= i.reorderLevel)
-      .map((i) => ({ label: i.name, value: Math.max(1, i.reorderLevel - i.qty), qty: i.qty, reorderLevel: i.reorderLevel, unit: i.unit }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [items]);
+  const sellers = useMemo(() => topSellers(stats.sales), [stats.sales]);
+  const idle = useMemo(() => notSelling(items, stats.sales), [items, stats.sales]);
+  const restock = useMemo(() => needsRestock(items), [items]);
 
   const fmt = (n) => `GH₵${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const loading = rows === null;
 
   return (
     <div>
@@ -152,66 +134,73 @@ export default function ReportsTab({ items, transactions }) {
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 26 }}>
-        <StatCard label="Revenue" value={fmt(revenue)} sub={`${unitsSold} unit${unitsSold === 1 ? "" : "s"} sold`} />
-        <StatCard label="Cost of goods sold" value={fmt(cogs)} />
-        <StatCard label="Gross profit" value={fmt(grossProfit)} accent={grossProfit >= 0 ? C.green : C.rust} sub={`${margin.toFixed(0)}% margin`} />
-        <StatCard label="Lost to waste" value={fmt(wasteCost)} accent={wasteCost > 0 ? C.rust : C.green} />
-      </div>
-
-      <h3 style={sectionHeading}>Profit trend</h3>
-      {trend.length === 0 ? (
-        <EmptyNote>No sales recorded {period === "all" ? "yet" : `in the last ${period} days`}. Record stock-outs with reason "Sold to customer" to see this fill in.</EmptyNote>
-      ) : (
-        <div style={{ ...cardWrap, marginBottom: 26 }}>
-          <DailyTrendChart days={trend} />
-        </div>
+      {error && (
+        <div style={{ background: C.rustSoft, color: C.rust, padding: "8px 12px", borderRadius: 8, fontSize: 12.5, marginBottom: 16 }}>{error}</div>
       )}
 
-      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <h3 style={sectionHeading}>Needs restock</h3>
-          {needsRestock.length === 0 ? (
-            <EmptyNote positive>Everything is above its reorder level.</EmptyNote>
+      {loading ? (
+        <div style={{ color: C.inkSoft, fontSize: 13.5, padding: "20px 0" }}>Working out the numbers…</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 26 }}>
+            <StatCard label="Revenue" value={fmt(stats.revenue)} sub={`${stats.unitsSold} unit${stats.unitsSold === 1 ? "" : "s"} sold`} />
+            <StatCard label="Cost of goods sold" value={fmt(stats.cogs)} />
+            <StatCard label="Gross profit" value={fmt(stats.grossProfit)} accent={stats.grossProfit >= 0 ? C.green : C.rust} sub={`${stats.margin.toFixed(0)}% margin`} />
+            <StatCard label="Lost to waste" value={fmt(stats.wasteCost)} accent={stats.wasteCost > 0 ? C.rust : C.green} />
+          </div>
+
+          <h3 style={sectionHeading}>Profit trend</h3>
+          {trend.length === 0 ? (
+            <EmptyNote>
+              No sales recorded {period === "all" ? "yet" : `in the last ${period} days`}. Record stock-outs with reason "Sold to customer" to see this fill in.
+            </EmptyNote>
           ) : (
-            <div style={cardWrap}>
-              <HorizontalBars
-                rows={needsRestock.map((r) => ({ ...r, color: C.rust }))}
-                valueLabel={(r) => `${r.qty}/${r.reorderLevel} ${r.unit}`}
-              />
+            <div style={{ ...cardWrap, marginBottom: 26 }}>
+              <TrendChart points={trend} />
             </div>
           )}
-        </div>
 
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <h3 style={sectionHeading}>Top sellers</h3>
-          {topSellers.length === 0 ? (
-            <EmptyNote>No sales recorded in this period.</EmptyNote>
-          ) : (
-            <div style={cardWrap}>
-              <HorizontalBars rows={topSellers} valueLabel={(r) => `${fmt(r.value)} · ${r.units} sold`} />
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: trend.length === 0 ? 26 : 0 }}>
+            <div style={{ flex: 1, minWidth: isNarrow ? "100%" : 280 }}>
+              <h3 style={sectionHeading}>Needs restock</h3>
+              {restock.length === 0 ? (
+                <EmptyNote positive>Everything is above its reorder level.</EmptyNote>
+              ) : (
+                <div style={cardWrap}>
+                  <HorizontalBars rows={restock.map((r) => ({ ...r, color: C.rust }))} valueLabel={(r) => `${r.qty}/${r.reorderLevel} ${r.unit}`} />
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <h3 style={sectionHeading}>Not selling</h3>
-          {notSelling.length === 0 ? (
-            <EmptyNote positive>Everything in stock has sold in this period.</EmptyNote>
-          ) : (
-            <div style={cardWrap}>
-              <HorizontalBars
-                rows={notSelling.map((r) => ({ ...r, color: C.goldDeep }))}
-                valueLabel={(r) => `${r.qty} ${r.unit} tied up`}
-              />
+            <div style={{ flex: 1, minWidth: isNarrow ? "100%" : 280 }}>
+              <h3 style={sectionHeading}>Top sellers</h3>
+              {sellers.length === 0 ? (
+                <EmptyNote>No sales recorded in this period.</EmptyNote>
+              ) : (
+                <div style={cardWrap}>
+                  <HorizontalBars rows={sellers} valueLabel={(r) => `${fmt(r.value)} · ${r.units} sold`} />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
 
-      <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 22 }}>
-        Based on the {transactions.length < 500 ? "full" : "most recent 500"} activity log entries. Only stock-outs recorded with reason "Sold to customer" count toward revenue and profit.
-      </div>
+            <div style={{ flex: 1, minWidth: isNarrow ? "100%" : 280 }}>
+              <h3 style={sectionHeading}>Not selling</h3>
+              {idle.length === 0 ? (
+                <EmptyNote positive>Everything in stock has sold in this period.</EmptyNote>
+              ) : (
+                <div style={cardWrap}>
+                  <HorizontalBars rows={idle.map((r) => ({ ...r, color: C.goldDeep }))} valueLabel={(r) => `${r.qty} ${r.unit} tied up`} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 22 }}>
+            Covering {rows.length.toLocaleString()} movement{rows.length === 1 ? "" : "s"}
+            {rows.length >= MAX_ROWS ? ` (capped at ${MAX_ROWS.toLocaleString()})` : ""}. Only stock-outs recorded with reason "Sold to customer" count toward revenue and profit.
+          </div>
+        </>
+      )}
     </div>
   );
 }
