@@ -3,7 +3,7 @@ import { ArrowDownCircle } from "lucide-react";
 import { C, SERIF } from "../utils/tokens.js";
 import { Button } from "./ui.jsx";
 
-function StatCard({ label, value, sub, accent }) {
+export function StatCard({ label, value, sub, accent }) {
   return (
     <div style={{ background: C.panel, border: `1px solid ${C.brownFaint}`, borderRadius: 12, padding: "16px 18px", flex: 1, minWidth: 150 }}>
       <div style={{ fontSize: 12, color: C.inkSoft, fontWeight: 600 }}>{label}</div>

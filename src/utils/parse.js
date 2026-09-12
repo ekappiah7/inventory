@@ -53,15 +53,6 @@ export function normalizeRow(row) {
   };
 }
 
-export function seedItems() {
-  return [
-    { name: "Basmati Rice 5kg", sku: "GR-1001", category: "Grains", qty: 42, reorderLevel: 15, unit: "bag", costPrice: 38, sellPrice: 48, supplierName: "Kumasi Wholesale" },
-    { name: "Cooking Oil 5L", sku: "GR-1002", category: "Cooking", qty: 8, reorderLevel: 10, unit: "bottle", costPrice: 55, sellPrice: 68, supplierName: "Golden Fields Ltd" },
-    { name: "Sugar 1kg", sku: "GR-1003", category: "Pantry", qty: 60, reorderLevel: 20, unit: "pack", costPrice: 9, sellPrice: 12, supplierName: "Kumasi Wholesale" },
-    { name: "Tomato Paste 400g", sku: "GR-1004", category: "Canned", qty: 5, reorderLevel: 12, unit: "tin", costPrice: 6, sellPrice: 8, supplierName: "Atufuo Direct" },
-  ];
-}
-
 // Turns the current item list into a downloadable CSV (used for both the
 // import template and exporting the live inventory).
 export function itemsToCsv(items) {

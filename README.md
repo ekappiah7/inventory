@@ -1,9 +1,10 @@
 # Stockroom: Inventory App
 
 A shop inventory app: add items, take stock in/out, get low-stock alerts,
-track suppliers, and bulk-import from CSV, Excel, or Word. Built with
-React + Vite, data stored in Firebase Firestore, deployed with Firebase
-Hosting.
+track suppliers, bulk-import from CSV, Excel, or Word, and see profit
+and loss, top sellers, and slow-moving stock in the Reports tab. Built
+with React + Vite, data stored in Firebase Firestore, deployed with
+Firebase Hosting.
 
 Each shop is its own "store" in the database. A shop owner creates the
 store and gets a Store ID; staff sign up with their own account and join
@@ -95,3 +96,14 @@ your live app.
 - Re-deploying: after any code change, run `npm run build && firebase
   deploy` again. If you change `firestore.rules`, deploy those
   separately with `firebase deploy --only firestore:rules`.
+- Reports and stock-out reasons: every stock-out asks for a reason
+  (Sold to customer, Damaged/expired/lost, or Other adjustment). Only
+  the ones marked "Sold to customer" count toward revenue and profit in
+  the Reports tab, so recording that accurately is what makes the P&L
+  numbers meaningful. Cost and sell price are captured on the
+  transaction at the moment it happens, so editing an item's price later
+  doesn't change past reports.
+- New shops start empty: there's no more sample/demo stock seeded in
+  automatically. If your shop already has the four example items
+  (Basmati Rice, Cooking Oil, Sugar, Tomato Paste) from before this
+  change, delete them from the Inventory tab (trash icon, owner only).

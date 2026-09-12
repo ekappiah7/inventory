@@ -8,9 +8,8 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { doc, collection, setDoc, getDoc, onSnapshot, serverTimestamp, writeBatch } from "firebase/firestore";
+import { doc, collection, setDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase.js";
-import { seedItems } from "../utils/parse.js";
 
 const AuthContext = createContext(null);
 
@@ -91,14 +90,6 @@ export function AuthProvider({ children }) {
       joinedAt: serverTimestamp(),
     });
     await setDoc(doc(db, "users", u.uid), { storeId: storeRef.id, displayName: displayName.trim(), email: u.email });
-
-    // Seed a few example items so a brand-new shop isn't a blank screen.
-    const batch = writeBatch(db);
-    for (const item of seedItems()) {
-      const itemRef = doc(collection(db, "stores", storeRef.id, "items"));
-      batch.set(itemRef, { ...item, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-    }
-    await batch.commit().catch(() => {}); // non-critical; ignore if it fails
 
     return storeRef.id;
   }, []);

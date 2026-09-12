@@ -18,6 +18,7 @@ import AddItemModal from "./components/AddItemModal.jsx";
 import MovementModal from "./components/MovementModal.jsx";
 import SuppliersTab from "./components/SuppliersTab.jsx";
 import TeamTab from "./components/TeamTab.jsx";
+import ReportsTab from "./components/ReportsTab.jsx";
 import { Button, ConfirmDialog } from "./components/ui.jsx";
 
 const ImportModal = lazy(() => import("./components/ImportModal.jsx"));
@@ -94,7 +95,10 @@ export default function StockroomApp() {
         ...fields, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
       if (fields.qty > 0) {
-        await logTx({ itemId: itemRef.id, itemName: fields.name, type: "initial", qty: fields.qty, note: "Initial stock" });
+        await logTx({
+          itemId: itemRef.id, itemName: fields.name, type: "initial", qty: fields.qty, note: "Initial stock",
+          unitCost: fields.costPrice || 0, unitPrice: fields.sellPrice || 0,
+        });
       }
       setSaveNote("");
     } catch (e) {
@@ -125,12 +129,15 @@ export default function StockroomApp() {
     setDeleteTarget(null);
   }
 
-  async function applyMovement(item, type, qty, note) {
+  async function applyMovement(item, type, qty, note, reason) {
     const safeQty = type === "out" ? Math.min(qty, item.qty) : qty;
     const delta = type === "in" ? safeQty : -safeQty;
     try {
       await updateDoc(doc(db, "stores", storeId, "items", item.id), { qty: increment(delta), updatedAt: serverTimestamp() });
-      await logTx({ itemId: item.id, itemName: item.name, type, qty: safeQty, note: note || "" });
+      await logTx({
+        itemId: item.id, itemName: item.name, type, reason, qty: safeQty, note: note || "",
+        unitCost: item.costPrice || 0, unitPrice: item.sellPrice || 0,
+      });
       setSaveNote("");
     } catch (e) {
       setSaveNote("Couldn't record that movement — try again.");
@@ -238,6 +245,7 @@ export default function StockroomApp() {
             onExport={exportInventory}
           />
         )}
+        {tab === "reports" && <ReportsTab items={items} transactions={transactions} />}
         {tab === "suppliers" && (
           <SuppliersTab
             suppliers={suppliers}
@@ -255,7 +263,7 @@ export default function StockroomApp() {
       {showAdd && <AddItemModal suppliers={suppliers} onClose={() => setShowAdd(false)} onSave={addItem} />}
       {editItem && <AddItemModal item={editItem} suppliers={suppliers} onClose={() => setEditItem(null)} onSave={updateItem} />}
       {moveItem && (
-        <MovementModal item={moveItem.item} type={moveItem.type} onClose={() => setMoveItem(null)} onConfirm={(qty, note) => applyMovement(moveItem.item, moveItem.type, qty, note)} />
+        <MovementModal item={moveItem.item} type={moveItem.type} onClose={() => setMoveItem(null)} onConfirm={(qty, note, reason) => applyMovement(moveItem.item, moveItem.type, qty, note, reason)} />
       )}
       {showImport && (
         <Suspense fallback={null}>

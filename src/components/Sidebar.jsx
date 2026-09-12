@@ -1,11 +1,12 @@
 import React from "react";
-import { LayoutGrid, Package, History, Truck, Users, AlertTriangle, LogOut } from "lucide-react";
+import { LayoutGrid, Package, History, Truck, Users, AlertTriangle, LogOut, BarChart3 } from "lucide-react";
 import { C, SERIF } from "../utils/tokens.js";
 
 export default function Sidebar({ tab, setTab, lowStockCount, storeName, displayName, role, onSignOut }) {
   const items = [
     { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
     { id: "inventory", label: "Inventory", icon: Package },
+    { id: "reports", label: "Reports", icon: BarChart3 },
     { id: "suppliers", label: "Suppliers", icon: Truck },
     { id: "log", label: "Activity", icon: History },
     { id: "team", label: "Team", icon: Users },
