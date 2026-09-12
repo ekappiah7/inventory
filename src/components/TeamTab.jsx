@@ -3,7 +3,7 @@ import { Copy, Check } from "lucide-react";
 import { C, SERIF } from "../utils/tokens.js";
 import { Button } from "./ui.jsx";
 
-export default function TeamTab({ storeId, storeName, members }) {
+export default function TeamTab({ storeId, storeName, members, canClear, itemCount, onClearRequest }) {
   const [copied, setCopied] = useState(false);
 
   async function copyId() {
@@ -53,6 +53,18 @@ export default function TeamTab({ storeId, storeName, members }) {
           </tbody>
         </table>
       </div>
+
+      {canClear && (
+        <div style={{ marginTop: 32, background: C.panel, border: `1px solid ${C.rustSoft}`, borderRadius: 12, padding: "16px 18px" }}>
+          <div style={{ fontFamily: SERIF, fontSize: 17, color: C.rust, marginBottom: 6 }}>Start from a clean sheet</div>
+          <div style={{ fontSize: 12.5, color: C.inkSoft, marginBottom: 12, lineHeight: 1.5 }}>
+            Deletes all {itemCount} item{itemCount === 1 ? "" : "s"}, every supplier, and the whole activity history for this shop.
+            Your account and your team stay exactly as they are. There's no undo, so export a CSV first from the Inventory tab if
+            you want a copy.
+          </div>
+          <Button variant="danger" onClick={onClearRequest}>Clear all shop data</Button>
+        </div>
+      )}
     </div>
   );
 }

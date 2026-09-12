@@ -60,11 +60,13 @@ service cloud.firestore {
         allow delete: if isOwner(storeId);
       }
 
-      // Transactions are an audit trail: any staff member can add one, but
-      // nobody can edit or delete history after the fact.
+      // Transactions are an audit trail: any staff member can add one, and
+      // nobody can ever edit one after the fact. The owner can delete them,
+      // which is only used by the "clear all shop data" reset.
       match /transactions/{txId} {
         allow read, create: if isMember(storeId);
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if isOwner(storeId);
       }
     }
   }

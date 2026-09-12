@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from "react";
 import {
-  collection, doc, query, orderBy, limit, onSnapshot,
+  collection, doc, query, orderBy, limit, onSnapshot, getDocs,
   addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, increment,
 } from "firebase/firestore";
 import { Plus, Search, Upload } from "lucide-react";
@@ -40,6 +40,8 @@ export default function StockroomApp() {
   const [moveItem, setMoveItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // { kind: 'item'|'supplier', doc }
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [saveNote, setSaveNote] = useState("");
 
   useEffect(() => {
@@ -183,6 +185,28 @@ export default function StockroomApp() {
     }
   }
 
+  // Owner-only reset: wipes every item, supplier and activity log entry so
+  // the shop starts from an empty sheet. Batched because Firestore caps a
+  // single batch at 500 writes.
+  async function clearAllData() {
+    setClearing(true);
+    try {
+      for (const name of ["items", "suppliers", "transactions"]) {
+        const snap = await getDocs(collection(db, "stores", storeId, name));
+        for (let i = 0; i < snap.docs.length; i += 400) {
+          const batch = writeBatch(db);
+          snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+      }
+      setSaveNote("");
+    } catch (e) {
+      setSaveNote("Couldn't clear everything — make sure you're signed in as the shop owner, then try again.");
+    }
+    setClearing(false);
+    setShowClearConfirm(false);
+  }
+
   function exportInventory() {
     const stamp = new Date().toISOString().slice(0, 10);
     downloadCsv(`${(store.name || "stockroom").replace(/\s+/g, "-").toLowerCase()}-inventory-${stamp}.csv`, itemsToCsv(items || []));
@@ -257,7 +281,16 @@ export default function StockroomApp() {
           />
         )}
         {tab === "log" && <ActivityLog transactions={transactions} />}
-        {tab === "team" && <TeamTab storeId={storeId} storeName={store.name} members={members} />}
+        {tab === "team" && (
+          <TeamTab
+            storeId={storeId}
+            storeName={store.name}
+            members={members}
+            canClear={isOwner}
+            itemCount={items.length}
+            onClearRequest={() => setShowClearConfirm(true)}
+          />
+        )}
       </div>
 
       {showAdd && <AddItemModal suppliers={suppliers} onClose={() => setShowAdd(false)} onSave={addItem} />}
@@ -269,6 +302,19 @@ export default function StockroomApp() {
         <Suspense fallback={null}>
           <ImportModal onClose={() => setShowImport(false)} onCommit={commitImport} />
         </Suspense>
+      )}
+      {showClearConfirm && (
+        <ConfirmDialog
+          title="Clear all shop data"
+          message={
+            clearing
+              ? "Clearing…"
+              : `This permanently deletes all ${items.length} item(s), every supplier, and the entire activity history for ${store.name}. Accounts and team members stay. This cannot be undone.`
+          }
+          confirmLabel={clearing ? "Clearing…" : "Yes, clear everything"}
+          onConfirm={clearing ? () => {} : clearAllData}
+          onCancel={() => { if (!clearing) setShowClearConfirm(false); }}
+        />
       )}
       {deleteTarget && (
         <ConfirmDialog
