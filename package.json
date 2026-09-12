@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ship": "git pull origin main && npm install && vite build && firebase deploy"
   },
   "dependencies": {
     "firebase": "^10.12.2",
