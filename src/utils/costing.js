@@ -2,11 +2,15 @@
 // what the stock actually on the shelf cost, so margins don't swing on when
 // somebody last edited an item's cost price by hand.
 
-// The cost to value a unit at: the blended average once there is one, and the
-// manually entered cost price for items that predate averaging.
+// The cost to value a unit at: the blended average once there is a real one,
+// otherwise the manually entered cost price. A zero average means "never
+// costed" (imported without a cost column, say) rather than "genuinely free",
+// so it must not mask a cost price the user has since typed in.
 export function effectiveCost(item) {
   if (!item) return 0;
-  return typeof item.avgCost === "number" ? item.avgCost : item.costPrice || 0;
+  const avg = Number(item.avgCost);
+  if (Number.isFinite(avg) && avg > 0) return avg;
+  return Number(item.costPrice) || 0;
 }
 
 // New average after receiving incomingQty units at incomingUnitCost each.

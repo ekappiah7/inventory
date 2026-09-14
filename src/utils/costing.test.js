@@ -15,8 +15,14 @@ describe("effectiveCost", () => {
     expect(effectiveCost({})).toBe(0);
   });
 
-  it("respects a genuine zero average rather than falling back", () => {
-    expect(effectiveCost({ avgCost: 0, costPrice: 38 })).toBe(0);
+  it("falls back to cost price when the average is zero, which means never costed", () => {
+    // Items imported without a cost column land here. Valuing them at zero
+    // would silently report the whole shop as worth nothing.
+    expect(effectiveCost({ avgCost: 0, costPrice: 38 })).toBe(38);
+  });
+
+  it("is zero only when there is genuinely no cost recorded either way", () => {
+    expect(effectiveCost({ avgCost: 0, costPrice: 0 })).toBe(0);
   });
 });
 

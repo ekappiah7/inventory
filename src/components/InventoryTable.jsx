@@ -1,6 +1,7 @@
 import React from "react";
 import { ArrowUpCircle, ArrowDownCircle, Pencil, Trash2, Download } from "lucide-react";
 import { C, iconBtn } from "../utils/tokens.js";
+import { effectiveCost } from "../utils/costing.js";
 import { Button } from "./ui.jsx";
 
 export default function InventoryTable({ items, categories, category, setCategory, canDelete, onMove, onEdit, onDeleteRequest, onExport }) {
@@ -33,7 +34,7 @@ export default function InventoryTable({ items, categories, category, setCategor
           <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: C.panelAlt, textAlign: "left" }}>
-                {["Item", "Category", "On hand", "Reorder at", "Unit value", "", ""].map((h) => (
+                {["Item", "Category", "On hand", "Reorder at", "Cost each", "Sells for", "", ""].map((h) => (
                   <th key={h} style={{ padding: "10px 14px", color: C.inkSoft, fontWeight: 600, fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
@@ -41,6 +42,7 @@ export default function InventoryTable({ items, categories, category, setCategor
             <tbody>
               {items.map((i) => {
                 const low = i.qty <= i.reorderLevel;
+                const cost = effectiveCost(i);
                 return (
                   <tr key={i.id} style={{ borderTop: `1px solid ${C.brownFaint}` }}>
                     <td style={{ padding: "10px 14px" }}>
@@ -58,6 +60,9 @@ export default function InventoryTable({ items, categories, category, setCategor
                       )}
                     </td>
                     <td style={{ padding: "10px 14px", color: C.inkSoft }}>{i.reorderLevel} {i.unit}</td>
+                    <td style={{ padding: "10px 14px", color: cost > 0 ? C.inkSoft : C.rust }}>
+                      {cost > 0 ? `GH₵${cost}` : "Not set"}
+                    </td>
                     <td style={{ padding: "10px 14px", color: C.inkSoft }}>GH₵{i.sellPrice || 0}</td>
                     <td style={{ padding: "10px 14px" }}>
                       <div style={{ display: "flex", gap: 4 }}>
