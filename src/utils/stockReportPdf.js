@@ -173,11 +173,14 @@ export function generateStockReportPdf({ storeName, preparedBy, items, now = new
     headStyles: { fillColor: BROWN_DARK, textColor: CREAM, fontStyle: "bold", fontSize: 8 },
     footStyles: { fillColor: SAND, textColor: BROWN_DARK, fontStyle: "bold", fontSize: 8.5 },
     alternateRowStyles: { fillColor: [252, 249, 242] },
-    // Widths are pinned so long category names wrap inside their column
-    // instead of running into the numbers beside them.
+    // Every column except the item name is pinned, so categories and figures
+    // keep their own space instead of running together. The name column is
+    // deliberately left flexible: it absorbs whatever width is left over, and
+    // without one flexible column autoTable cannot reconcile the table to the
+    // page and logs a warning on every run.
     columnStyles: showSku
       ? {
-          0: { cellWidth: 110, fontStyle: "bold" },
+          0: { fontStyle: "bold" },
           1: { cellWidth: 52 },
           2: { cellWidth: 70 },
           3: { cellWidth: 58, halign: "right" },
@@ -186,7 +189,7 @@ export function generateStockReportPdf({ storeName, preparedBy, items, now = new
           6: { cellWidth: 88, halign: "right" },
         }
       : {
-          0: { cellWidth: 130, fontStyle: "bold" },
+          0: { fontStyle: "bold" },
           1: { cellWidth: 78 },
           2: { cellWidth: 62, halign: "right" },
           3: { cellWidth: 74, halign: "right" },
