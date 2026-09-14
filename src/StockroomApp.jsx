@@ -272,6 +272,22 @@ export default function StockroomApp() {
     }
   }
 
+  // jsPDF is heavy and most sessions never ask for a report, so it is only
+  // fetched when someone actually clicks.
+  async function downloadStockReport() {
+    try {
+      const { downloadStockReportPdf } = await import("./utils/stockReportPdf.js");
+      downloadStockReportPdf({
+        storeName: store.name,
+        preparedBy: member?.displayName || user.email,
+        items: items || [],
+      });
+      setSaveNote("");
+    } catch {
+      setSaveNote("Couldn't build that PDF — try again.");
+    }
+  }
+
   function exportInventory() {
     const stamp = new Date().toISOString().slice(0, 10);
     downloadCsv(`${slug(store.name)}-inventory-${stamp}.csv`, itemsToCsv(items || []));
@@ -333,9 +349,12 @@ export default function StockroomApp() {
             onEdit={setEditItem}
             onDeleteRequest={(item) => setDeleteTarget({ kind: "item", doc: item })}
             onExport={exportInventory}
+            onDownloadPdf={downloadStockReport}
           />
         )}
-        {tab === "reports" && <ReportsTab storeId={storeId} items={items} isNarrow={isNarrow} />}
+        {tab === "reports" && (
+          <ReportsTab storeId={storeId} items={items} isNarrow={isNarrow} onDownloadStockPdf={downloadStockReport} />
+        )}
         {tab === "suppliers" && (
           <SuppliersTab
             suppliers={suppliers}

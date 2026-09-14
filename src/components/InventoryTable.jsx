@@ -1,10 +1,10 @@
 import React from "react";
-import { ArrowUpCircle, ArrowDownCircle, Pencil, Trash2, Download } from "lucide-react";
+import { ArrowUpCircle, ArrowDownCircle, Pencil, Trash2, Download, FileText } from "lucide-react";
 import { C, iconBtn } from "../utils/tokens.js";
 import { effectiveCost } from "../utils/costing.js";
 import { Button } from "./ui.jsx";
 
-export default function InventoryTable({ items, categories, category, setCategory, canDelete, onMove, onEdit, onDeleteRequest, onExport }) {
+export default function InventoryTable({ items, categories, category, setCategory, canDelete, onMove, onEdit, onDeleteRequest, onExport, onDownloadPdf }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 8, flexWrap: "wrap" }}>
@@ -24,7 +24,10 @@ export default function InventoryTable({ items, categories, category, setCategor
             </button>
           ))}
         </div>
-        <Button variant="outline" icon={Download} onClick={onExport}>Export CSV</Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button variant="outline" icon={FileText} onClick={onDownloadPdf}>Stock report PDF</Button>
+          <Button variant="outline" icon={Download} onClick={onExport}>Export CSV</Button>
+        </div>
       </div>
 
       {items.length === 0 ? (

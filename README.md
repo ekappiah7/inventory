@@ -106,6 +106,14 @@ your live app.
 - Re-deploying: after any code change, run `npm run build && firebase
   deploy` again. If you change `firestore.rules`, deploy those
   separately with `firebase deploy --only firestore:rules`.
+- Stock report PDF: the Reports tab (and the Inventory tab) has a
+  "Stock report PDF" button that downloads a dated, printable report of
+  everything on the shelf, with cost, selling price and value per line,
+  shop-wide totals, and a restock list. It reflects the shop's live
+  stock at the moment you press it. The PDF uses "GHS" rather than the
+  cedi symbol, because the fonts built into the PDF format can't draw
+  that character. jsPDF is only downloaded when the button is pressed,
+  so it doesn't slow down opening the app.
 - How item cost is worked out: each item carries a weighted average cost
   of the stock actually on hand. When you record a delivery ("Stock in"
   with reason "Purchased from supplier") you enter what you paid per

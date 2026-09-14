@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "../firebase.js";
+import { FileText } from "lucide-react";
 import { C, SERIF } from "../utils/tokens.js";
+import { Button } from "./ui.jsx";
 import { StatCard } from "./Dashboard.jsx";
 import { summarise, profitTrend, topSellers, notSelling, needsRestock } from "../utils/reports.js";
 
@@ -73,7 +75,7 @@ function TrendChart({ points }) {
   );
 }
 
-export default function ReportsTab({ storeId, items, isNarrow }) {
+export default function ReportsTab({ storeId, items, isNarrow, onDownloadStockPdf }) {
   const [period, setPeriod] = useState(30);
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
@@ -117,6 +119,17 @@ export default function ReportsTab({ storeId, items, isNarrow }) {
 
   return (
     <div>
+      <div style={{ ...cardWrap, marginBottom: 22, display: "flex", gap: 14, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+        <div style={{ minWidth: 220, flex: 1 }}>
+          <div style={{ fontFamily: SERIF, fontSize: 17, color: C.brownDark, marginBottom: 4 }}>Stock report</div>
+          <div style={{ fontSize: 12.5, color: C.inkSoft, lineHeight: 1.5 }}>
+            Everything on the shelf right now with cost, selling price and value per line, totalled, with a restock list at the
+            end. A printable PDF you can file, email, or hand to a bank.
+          </div>
+        </div>
+        <Button variant="solid" icon={FileText} onClick={onDownloadStockPdf}>Download PDF</Button>
+      </div>
+
       <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
         {PERIODS.map((p) => (
           <button
