@@ -6,6 +6,7 @@ import { C, SERIF } from "../utils/tokens.js";
 import { Button } from "./ui.jsx";
 import { StatCard } from "./Dashboard.jsx";
 import { summarise, profitTrend, topSellers, notSelling, needsRestock } from "../utils/reports.js";
+import { summariseStock } from "../utils/stockReport.js";
 
 const PERIODS = [
   { id: 7, label: "7 days" },
@@ -113,21 +114,42 @@ export default function ReportsTab({ storeId, items, isNarrow, onDownloadStockPd
   const sellers = useMemo(() => topSellers(stats.sales), [stats.sales]);
   const idle = useMemo(() => notSelling(items, stats.sales), [items, stats.sales]);
   const restock = useMemo(() => needsRestock(items), [items]);
+  // What's on the shelf right now, independent of the period selector above,
+  // which only filters sales history.
+  const stock = useMemo(() => summariseStock(items), [items]);
 
   const fmt = (n) => `GH₵${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   const loading = rows === null;
 
   return (
     <div>
-      <div style={{ ...cardWrap, marginBottom: 22, display: "flex", gap: 14, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-        <div style={{ minWidth: 220, flex: 1 }}>
-          <div style={{ fontFamily: SERIF, fontSize: 17, color: C.brownDark, marginBottom: 4 }}>Stock report</div>
-          <div style={{ fontSize: 12.5, color: C.inkSoft, lineHeight: 1.5 }}>
-            Everything on the shelf right now with cost, selling price and value per line, totalled, with a restock list at the
-            end. A printable PDF you can file, email, or hand to a bank.
+      <div style={{ ...cardWrap, marginBottom: 22 }}>
+        <div style={{ display: "flex", gap: 14, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 16 }}>
+          <div style={{ minWidth: 220, flex: 1 }}>
+            <div style={{ fontFamily: SERIF, fontSize: 17, color: C.brownDark, marginBottom: 4 }}>Stock on hand right now</div>
+            <div style={{ fontSize: 12.5, color: C.inkSoft, lineHeight: 1.5 }}>
+              Not affected by the period picker below, this is what's on the shelf at this moment. Download a line-by-line PDF
+              of it to file, email, or hand to a bank.
+            </div>
           </div>
+          <Button variant="solid" icon={FileText} onClick={onDownloadStockPdf}>Download PDF</Button>
         </div>
-        <Button variant="solid" icon={FileText} onClick={onDownloadStockPdf}>Download PDF</Button>
+
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <StatCard
+            label="Stock value"
+            value={fmt(stock.totalValue)}
+            sub={stock.missingCostCount > 0 ? `${stock.missingCostCount} item(s) missing a cost price` : "At average cost"}
+            accent={stock.missingCostCount > 0 ? C.rust : undefined}
+          />
+          <StatCard label="Retail value" value={fmt(stock.totalRetail)} sub="If sold at current prices" />
+          <StatCard
+            label="Potential profit"
+            value={fmt(stock.potentialProfit)}
+            sub="Retail value minus stock value"
+            accent={stock.potentialProfit >= 0 ? C.green : C.rust}
+          />
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
